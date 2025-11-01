@@ -1,26 +1,38 @@
-name: Build us65percent (UF2)
+name: Build UF2 (qmk-us65percent)
 
 on:
   push:
     branches: ["**"]
-  pull_request:
   workflow_dispatch:
 
 jobs:
   build:
     runs-on: ubuntu-latest
-    container:
-      image: qmkfm/qmk_cli:latest
     steps:
-      - name: Checkout this repo
+      - name: Checkout (this repo)
         uses: actions/checkout@v4
 
-      - name: Checkout qmk_firmware
+      - name: Install build deps (rsync, ARM toolchain, qmk-cli)
+        run: |
+          set -e
+          sudo apt-get update
+          sudo apt-get install -y rsync gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi python3-pip
+          python3 -m pip install --user qmk
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+
+      - name: Checkout qmk/qmk_firmware
         uses: actions/checkout@v4
         with:
           repository: qmk/qmk_firmware
           path: qmk_firmware
           fetch-depth: 1
+
+      - name: Init submodules (ChibiOS, pico-sdk, etc.)
+        working-directory: qmk_firmware
+        run: |
+          set -e
+          git submodule sync --recursive
+          git submodule update --init --recursive --depth 1
 
       - name: QMK version
         run: qmk --version
