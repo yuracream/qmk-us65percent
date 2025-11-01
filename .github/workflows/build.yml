@@ -1,4 +1,4 @@
-name: Build UF2 (qmk-us65percent)
+name: Build Keyboard Firmware
 
 on:
   push:
@@ -9,33 +9,20 @@ jobs:
   build:
     runs-on: ubuntu-latest
     steps:
-      - name: Checkout (this repo)
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
 
-      - name: Install build deps (rsync, ARM toolchain, qmk-cli)
+      - name: Install deps (qmk, rsync)
         run: |
-          set -e
-          sudo apt-get update
-          sudo apt-get install -y rsync gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi python3-pip
+          sudo apt-get update -y
+          sudo apt-get install -y rsync python3-pip
           python3 -m pip install --user qmk
-          echo "$HOME/.local/bin" >> $GITHUB_PATH
 
-      - name: Checkout qmk/qmk_firmware
-        uses: actions/checkout@v4
-        with:
-          repository: qmk/qmk_firmware
-          path: qmk_firmware
-          fetch-depth: 1
-
-      - name: Init submodules (ChibiOS, pico-sdk, etc.)
-        working-directory: qmk_firmware
+      - name: Clone qmk_firmware
         run: |
-          set -e
-          git submodule sync --recursive
-          git submodule update --init --recursive --depth 1
+          git clone --depth 1 https://github.com/qmk/qmk_firmware.git
 
       - name: QMK version
-        run: qmk --version
+        run: ~/.local/bin/qmk --version || qmk --version || true
 
       - name: Place keyboard into qmk tree
         run: |
@@ -45,24 +32,37 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
-      - name: Build (vial keymap, rp2040)
+      - name: Build (force rp2040 -> UF2)
         working-directory: qmk_firmware
         env:
           VIAL_INSECURE: "yes"
         run: |
           set -e
-          qmk clean
-          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
+          qmk clean || ~/.local/bin/qmk clean || true
+          ~/.local/bin/qmk info -kb handwired/us65percent -km vial || qmk info -kb handwired/us65percent -km vial || true
+          # BOOTLOADER/MCUを強制（rules.mkでも設定しているが念のため）
+          ~/.local/bin/qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes -e BOOTLOADER=rp2040 -e MCU=RP2040 || \
+          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes -e BOOTLOADER=rp2040 -e MCU=RP2040
           echo "==== build outputs ===="
-          ls -l .build || true
+          find .build -maxdepth 3 -type f -printf "%p\n" | sort || true
 
-      - name: Upload artifacts (UF2/HEX/BIN)
+      - name: Upload artifacts (UF2/HEX/BIN/ELF)
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: us65percent-build
           path: |
-            qmk_firmware/.build/*.uf2
-            qmk_firmware/.build/*.hex
-            qmk_firmware/.build/*.bin
+            qmk_firmware/.build/**/*.uf2
+            qmk_firmware/.build/**/*.hex
+            qmk_firmware/.build/**/*.bin
+            qmk_firmware/.build/**/*.elf
+          if-no-files-found: warn
+
+      # 念のためのフォールバック（.build丸ごと）
+      - name: Upload .build folder (fallback)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us65percent-build-all
+          path: qmk_firmware/.build
           if-no-files-found: warn
