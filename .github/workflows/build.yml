@@ -1,0 +1,56 @@
+name: Build us65percent (UF2)
+
+on:
+  push:
+    branches: ["**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    container:
+      image: qmkfm/qmk_cli:latest
+    steps:
+      - name: Checkout this repo
+        uses: actions/checkout@v4
+
+      - name: Checkout qmk_firmware
+        uses: actions/checkout@v4
+        with:
+          repository: qmk/qmk_firmware
+          path: qmk_firmware
+          fetch-depth: 1
+
+      - name: QMK version
+        run: qmk --version
+
+      - name: Place keyboard into qmk tree
+        run: |
+          set -e
+          mkdir -p qmk_firmware/keyboards/handwired/us65percent
+          rsync -av --delete ./us65percent/ qmk_firmware/keyboards/handwired/us65percent/
+          echo "==== copied files ===="
+          find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
+
+      - name: Build (vial keymap, rp2040)
+        working-directory: qmk_firmware
+        env:
+          VIAL_INSECURE: "yes"
+        run: |
+          set -e
+          qmk clean
+          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
+          echo "==== build outputs ===="
+          ls -l .build || true
+
+      - name: Upload artifacts (UF2/HEX/BIN)
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: us65percent-build
+          path: |
+            qmk_firmware/.build/*.uf2
+            qmk_firmware/.build/*.hex
+            qmk_firmware/.build/*.bin
+          if-no-files-found: warn
