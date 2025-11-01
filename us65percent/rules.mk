@@ -3,7 +3,7 @@ MCU = RP2040
 BOOTLOADER = rp2040
 PLATFORM = chibios
 
-# (お好み) 使ってないなら無効化してビルドを軽く
+# optional: 使ってない機能はOFFにすると軽い
 MOUSEKEY_ENABLE = no
 RGBLIGHT_ENABLE = no
 NKRO_ENABLE = yes
