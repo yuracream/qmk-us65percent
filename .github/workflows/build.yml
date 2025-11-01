@@ -1,37 +1,31 @@
-name: Build Keyboard Firmware
+name: Build us65percent (RP2040)
 
 on:
   push:
     branches: ["**"]
-  workflow_dispatch:
+  pull_request:
+    branches: ["**"]
 
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout repo
+        uses: actions/checkout@v4
 
-      - name: Install deps (toolchain, qmk, rsync)
+      - name: Install build deps (arm gcc + rsync + qmk)
         run: |
-          sudo apt-get update -y
-          # ツールチェーンと必要コマンド
-          sudo apt-get install -y \
-            gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
-            dfu-util git make rsync python3-pip
-          python3 -m pip install --user qmk
+          sudo apt-get update
+          sudo apt-get install -y gcc-arm-none-eabi rsync python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install qmk
 
-      - name: Clone qmk_firmware
+      - name: Clone QMK firmware
         run: |
-          git clone --depth 1 https://github.com/qmk/qmk_firmware.git
-
-      - name: Prepare qmk (submodules & python reqs)
-        working-directory: qmk_firmware
-        run: |
-          # ChibiOSなどのサブモジュールを取得
-          git submodule update --init --recursive
-          # 念のため requirements
-          python3 -m pip install --user -r requirements.txt || true
-          make git-submodule
+          git clone --depth=1 https://github.com/qmk/qmk_firmware.git
+          (cd qmk_firmware && git submodule update --init --recursive)
+          qmk --version
 
       - name: Place keyboard into qmk tree
         run: |
@@ -41,34 +35,32 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
-      - name: Build (rp2040 -> UF2)
+      - name: Build (vial keymap)
         working-directory: qmk_firmware
         env:
           VIAL_INSECURE: "yes"
         run: |
           set -e
-          qmk clean || true
-          qmk info -kb handwired/us65percent -km vial || true
-          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes 
+          qmk clean
+          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
           echo "==== build outputs ===="
-          find .build -maxdepth 3 -type f -printf "%p\n" | sort || true
+          find .build -maxdepth 1 -type f -printf "%f\n" || true
 
-      - name: Upload artifacts (UF2/HEX/BIN/ELF)
-        if: always()
+      - name: Package artifacts (zip)
+        run: |
+          set -e
+          cd qmk_firmware
+          mkdir -p ../artifacts
+          # できたものを全部回収（存在しない拡張子は無視）
+          cp -v .build/*.{uf2,hex,bin,elf,map} ../artifacts/ 2>/dev/null || true
+          ls -l ../artifacts
+          cd ../artifacts
+          zip -r us65percent-${GITHUB_SHA::7}.zip .
+          ls -l
+
+      - name: Upload artifacts (zip)
         uses: actions/upload-artifact@v4
         with:
           name: us65percent-build
-          path: |
-            qmk_firmware/.build/**/*.uf2
-            qmk_firmware/.build/**/*.hex
-            qmk_firmware/.build/**/*.bin
-            qmk_firmware/.build/**/*.elf
-          if-no-files-found: warn
-
-      - name: Upload .build folder (fallback)
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: us65percent-build-all
-          path: qmk_firmware/.build
-          if-no-files-found: warn
+          path: artifacts/*.zip
+          if-no-files-found: error
