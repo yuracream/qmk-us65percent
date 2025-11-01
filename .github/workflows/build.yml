@@ -11,18 +11,27 @@ jobs:
     steps:
       - uses: actions/checkout@v4
 
-      - name: Install deps (qmk, rsync)
+      - name: Install deps (toolchain, qmk, rsync)
         run: |
           sudo apt-get update -y
-          sudo apt-get install -y rsync python3-pip
+          # ツールチェーンと必要コマンド
+          sudo apt-get install -y \
+            gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
+            dfu-util git make rsync python3-pip
           python3 -m pip install --user qmk
 
       - name: Clone qmk_firmware
         run: |
           git clone --depth 1 https://github.com/qmk/qmk_firmware.git
 
-      - name: QMK version
-        run: ~/.local/bin/qmk --version || qmk --version || true
+      - name: Prepare qmk (submodules & python reqs)
+        working-directory: qmk_firmware
+        run: |
+          # ChibiOSなどのサブモジュールを取得
+          git submodule update --init --recursive
+          # 念のため requirements
+          python3 -m pip install --user -r requirements.txt || true
+          make git-submodule
 
       - name: Place keyboard into qmk tree
         run: |
@@ -32,16 +41,14 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
-      - name: Build (force rp2040 -> UF2)
+      - name: Build (rp2040 -> UF2)
         working-directory: qmk_firmware
         env:
           VIAL_INSECURE: "yes"
         run: |
           set -e
-          qmk clean || ~/.local/bin/qmk clean || true
-          ~/.local/bin/qmk info -kb handwired/us65percent -km vial || qmk info -kb handwired/us65percent -km vial || true
-          # BOOTLOADER/MCUを強制（rules.mkでも設定しているが念のため）
-          ~/.local/bin/qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes -e BOOTLOADER=rp2040 -e MCU=RP2040 || \
+          qmk clean || true
+          qmk info -kb handwired/us65percent -km vial || true
           qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes -e BOOTLOADER=rp2040 -e MCU=RP2040
           echo "==== build outputs ===="
           find .build -maxdepth 3 -type f -printf "%p\n" | sort || true
@@ -58,7 +65,6 @@ jobs:
             qmk_firmware/.build/**/*.elf
           if-no-files-found: warn
 
-      # 念のためのフォールバック（.build丸ごと）
       - name: Upload .build folder (fallback)
         if: always()
         uses: actions/upload-artifact@v4
