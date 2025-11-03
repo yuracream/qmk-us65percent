@@ -13,14 +13,23 @@ jobs:
 
     steps:
       - name: Checkout repo
+      # リポジトリ本体を取得
         uses: actions/checkout@v4
 
-      - name: Install deps (arm toolchain, rsync, zip)
+      - name: Install deps (arm toolchain, rsync, zip, python/pip, qmk CLI)
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi rsync zip
+          sudo apt-get install -y \
+            gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi \
+            rsync zip python3 python3-pip
+          python3 -m pip install --upgrade pip
+          python3 -m pip install qmk
+          # pip のスクリプトパスを PATH に通す
+          echo "$HOME/.local/bin" >> $GITHUB_PATH
+          qmk --version || true
 
       - name: Clone vial-qmk firmware
+      # 上流QMKではなく "vial-kb/vial-qmk" を使うのが超重要
         run: |
           git clone --depth=1 https://github.com/vial-kb/vial-qmk.git qmk_firmware
           (cd qmk_firmware && git submodule update --init --recursive)
@@ -33,14 +42,18 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
+          # 最低限の存在チェック（vial keymapが無いとビルドできない）
+          test -d qmk_firmware/keyboards/handwired/us65percent/keymaps/vial || (echo "missing keymaps/vial" && exit 1)
+
       - name: Build (make, RP2040 -> UF2)
         working-directory: qmk_firmware
         env:
-          VIAL_INSECURE: "yes"   # 必要なら有効化。なくてもOK
+          VIAL_INSECURE: "yes"   # 必要なければ削ってOK
           MAKEFLAGS: "-j2"
         run: |
           set -e
           make clean
+          # handwired/us65percent に対して "vial" キーマップでビルド
           make handwired/us65percent:vial VIAL_INSECURE=${VIAL_INSECURE}
           echo "==== build outputs ===="
           ls -l .build || true
@@ -62,6 +75,7 @@ jobs:
           name: us65percent-build
           path: artifacts/*.zip
           if-no-files-found: error
+
 
 # 上流QMK
 # name: Build us65percent (RP2040)
