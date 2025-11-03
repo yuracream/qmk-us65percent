@@ -1,5 +1,5 @@
 # vial-qmk
-name: Build us65percent (RP2040)
+name: Build us65percent (RP2040, vial-qmk)
 
 on:
   push:
@@ -10,22 +10,20 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
+
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
 
-      - name: Install build deps (arm gcc + rsync + qmk)
+      - name: Install deps (arm toolchain, rsync, zip)
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi rsync python3-pip zip
-          python3 -m pip install --upgrade pip
-          python3 -m pip install qmk
+          sudo apt-get install -y gcc-arm-none-eabi binutils-arm-none-eabi libnewlib-arm-none-eabi rsync zip
 
       - name: Clone vial-qmk firmware
         run: |
           git clone --depth=1 https://github.com/vial-kb/vial-qmk.git qmk_firmware
           (cd qmk_firmware && git submodule update --init --recursive)
-          qmk --version
 
       - name: Place keyboard into vial-qmk tree
         run: |
@@ -35,15 +33,15 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
-      - name: Build (vial keymap, RP2040 -> UF2)
+      - name: Build (make, RP2040 -> UF2)
         working-directory: qmk_firmware
         env:
-          VIAL_INSECURE: "yes"
+          VIAL_INSECURE: "yes"   # 必要なら有効化。なくてもOK
+          MAKEFLAGS: "-j2"
         run: |
           set -e
-          qmk clean -H "$(pwd)"
-          # QMK_HOMEをこのvial-qmkに向けてコンパイル
-          qmk compile -H "$(pwd)" -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
+          make clean
+          make handwired/us65percent:vial VIAL_INSECURE=${VIAL_INSECURE}
           echo "==== build outputs ===="
           ls -l .build || true
 
@@ -52,6 +50,7 @@ jobs:
           set -e
           cd qmk_firmware
           mkdir -p ../artifacts
+          # 生成物を回収（存在しない拡張子は無視）
           cp -v .build/*.{uf2,hex,bin,elf,map} ../artifacts/ 2>/dev/null || true
           cd ../artifacts
           zip -r us65percent-${GITHUB_SHA::7}.zip .
