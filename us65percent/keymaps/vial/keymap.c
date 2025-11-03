@@ -12,11 +12,23 @@
 
 const uint16_t PROGMEM keymaps[][MATRIX_ROWS][MATRIX_COLS] = {
     [0] = LAYOUT_65_ansi(
-      KC_ESCAPE,KC_1,KC_2,KC_3,KC_4,KC_5,KC_6,KC_7,KC_8,KC_9,KC_0,                KC_MINUS,KC_EQUAL,KC_BACKSLASH,
-      KC_TAB,KC_Q,KC_W,KC_E,KC_R,KC_T,KC_Y,KC_U,KC_I,KC_O,KC_P,                   KC_LEFT_BRACKET,KC_RIGHT_BRACKET,KC_GRAVE,
-      KC_LEFT_CTRL,KC_A,KC_S,KC_D,KC_F,KC_G,KC_H,KC_J,KC_K,KC_L,KC_SEMICOLON,     KC_QUOTE,KC_ENTER,KC_BACKSPACE,
-      KC_LEFT_SHIFT,KC_Z,KC_X,KC_C,KC_V,KC_B,KC_N,KC_M,KC_COMMA,KC_DOT,KC_SLASH,  KC_BACKSLASH,KC_RIGHT_SHIFT,
-      KC_LEFT_GUI,KC_LEFT_ALT,KC_TRANSPARENT,KC_LANGUAGE_2,KC_SPACE,KC_ENTER,KC_TRANSPARENT,KC_LANGUAGE_1,KC_TRANSPARENT,KC_RIGHT_ALT,KC_APPLICATION, KC_RIGHT_GUI
+              KC_ESCAPE,            KC_1,            KC_2,            KC_3,
+                   KC_4,            KC_5,            KC_6,            KC_7,
+                   KC_8,            KC_9,            KC_0,        KC_MINUS,
+               KC_EQUAL,    KC_BACKSLASH,          KC_TAB,            KC_Q,
+                   KC_W,            KC_E,            KC_R,            KC_T,
+                   KC_Y,            KC_U,            KC_I,            KC_O,
+                   KC_P, KC_LEFT_BRACKET, KC_RIGHT_BRACKET,       KC_DELETE,
+           KC_CAPS_LOCK,            KC_A,            KC_S,            KC_D,
+                   KC_F,            KC_G,            KC_H,            KC_J,
+                   KC_K,            KC_L,    KC_SEMICOLON,        KC_QUOTE,
+               KC_ENTER,    KC_BACKSPACE,   KC_LEFT_SHIFT,            KC_Z,
+                   KC_X,            KC_C,            KC_V,            KC_B,
+                   KC_N,            KC_M,        KC_COMMA,          KC_DOT,
+               KC_SLASH,    KC_BACKSLASH,  KC_RIGHT_SHIFT,     KC_LEFT_GUI,
+           KC_LEFT_CTRL,     KC_LEFT_ALT, KC_INTERNATIONAL_5,        KC_SPACE,
+               KC_ENTER,           TO(0), KC_INTERNATIONAL_4,           TO(1),
+           KC_RIGHT_ALT,  KC_APPLICATION,    KC_RIGHT_GUI
     ),
     [1] = LAYOUT_65_ansi(
          KC_TRANSPARENT,           KC_F1,           KC_F2,           KC_F3,
@@ -106,7 +118,7 @@ const vial_combo_entry_t PROGMEM default_combo_entries[] = {
 
 // Macro buffer
 const uint8_t PROGMEM default_macro_buffer[] = {
-
+    
 };
 
 // Key Override definitions
@@ -197,7 +209,7 @@ void __wrap_dynamic_keymap_reset(void) {
     #endif
 
     qmk_settings_init();
-#endif
+#endif 
 
     uint16_t const macro_buffer_size = MIN(sizeof(default_macro_buffer), dynamic_keymap_macro_get_buffer_size());
     dynamic_keymap_macro_set_buffer(0, macro_buffer_size, (uint8_t *)default_macro_buffer);
