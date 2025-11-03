@@ -1,3 +1,4 @@
+# vial-qmk
 name: Build us65percent (RP2040)
 
 on:
@@ -9,7 +10,6 @@ on:
 jobs:
   build:
     runs-on: ubuntu-latest
-
     steps:
       - name: Checkout repo
         uses: actions/checkout@v4
@@ -17,17 +17,17 @@ jobs:
       - name: Install build deps (arm gcc + rsync + qmk)
         run: |
           sudo apt-get update
-          sudo apt-get install -y gcc-arm-none-eabi rsync python3-pip
+          sudo apt-get install -y gcc-arm-none-eabi rsync python3-pip zip
           python3 -m pip install --upgrade pip
           python3 -m pip install qmk
 
-      - name: Clone QMK firmware
+      - name: Clone vial-qmk firmware
         run: |
-          git clone --depth=1 https://github.com/qmk/qmk_firmware.git
+          git clone --depth=1 https://github.com/vial-kb/vial-qmk.git qmk_firmware
           (cd qmk_firmware && git submodule update --init --recursive)
           qmk --version
 
-      - name: Place keyboard into qmk tree
+      - name: Place keyboard into vial-qmk tree
         run: |
           set -e
           mkdir -p qmk_firmware/keyboards/handwired/us65percent
@@ -35,25 +35,24 @@ jobs:
           echo "==== copied files ===="
           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
 
-      - name: Build (vial keymap)
+      - name: Build (vial keymap, RP2040 -> UF2)
         working-directory: qmk_firmware
         env:
           VIAL_INSECURE: "yes"
         run: |
           set -e
-          qmk clean
-          qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
+          qmk clean -H "$(pwd)"
+          # QMK_HOMEをこのvial-qmkに向けてコンパイル
+          qmk compile -H "$(pwd)" -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
           echo "==== build outputs ===="
-          find .build -maxdepth 1 -type f -printf "%f\n" || true
+          ls -l .build || true
 
       - name: Package artifacts (zip)
         run: |
           set -e
           cd qmk_firmware
           mkdir -p ../artifacts
-          # できたものを全部回収（存在しない拡張子は無視）
           cp -v .build/*.{uf2,hex,bin,elf,map} ../artifacts/ 2>/dev/null || true
-          ls -l ../artifacts
           cd ../artifacts
           zip -r us65percent-${GITHUB_SHA::7}.zip .
           ls -l
@@ -64,3 +63,71 @@ jobs:
           name: us65percent-build
           path: artifacts/*.zip
           if-no-files-found: error
+
+# 上流QMK
+# name: Build us65percent (RP2040)
+
+# on:
+#   push:
+#     branches: ["**"]
+#   pull_request:
+#     branches: ["**"]
+
+# jobs:
+#   build:
+#     runs-on: ubuntu-latest
+
+#     steps:
+#       - name: Checkout repo
+#         uses: actions/checkout@v4
+
+#       - name: Install build deps (arm gcc + rsync + qmk)
+#         run: |
+#           sudo apt-get update
+#           sudo apt-get install -y gcc-arm-none-eabi rsync python3-pip
+#           python3 -m pip install --upgrade pip
+#           python3 -m pip install qmk
+
+#       - name: Clone QMK firmware
+#         run: |
+#           git clone --depth=1 https://github.com/qmk/qmk_firmware.git
+#           (cd qmk_firmware && git submodule update --init --recursive)
+#           qmk --version
+
+#       - name: Place keyboard into qmk tree
+#         run: |
+#           set -e
+#           mkdir -p qmk_firmware/keyboards/handwired/us65percent
+#           rsync -av --delete ./us65percent/ qmk_firmware/keyboards/handwired/us65percent/
+#           echo "==== copied files ===="
+#           find qmk_firmware/keyboards/handwired/us65percent -maxdepth 2 -type f | sort
+
+#       - name: Build (vial keymap)
+#         working-directory: qmk_firmware
+#         env:
+#           VIAL_INSECURE: "yes"
+#         run: |
+#           set -e
+#           qmk clean
+#           qmk compile -kb handwired/us65percent -km vial -e VIAL_INSECURE=yes
+#           echo "==== build outputs ===="
+#           find .build -maxdepth 1 -type f -printf "%f\n" || true
+
+#       - name: Package artifacts (zip)
+#         run: |
+#           set -e
+#           cd qmk_firmware
+#           mkdir -p ../artifacts
+#           # できたものを全部回収（存在しない拡張子は無視）
+#           cp -v .build/*.{uf2,hex,bin,elf,map} ../artifacts/ 2>/dev/null || true
+#           ls -l ../artifacts
+#           cd ../artifacts
+#           zip -r us65percent-${GITHUB_SHA::7}.zip .
+#           ls -l
+
+#       - name: Upload artifacts (zip)
+#         uses: actions/upload-artifact@v4
+#         with:
+#           name: us65percent-build
+#           path: artifacts/*.zip
+#           if-no-files-found: error
